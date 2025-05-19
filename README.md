@@ -17,7 +17,7 @@ A Python desktop application for real-time face, facial feature, and emotion ana
 ### 1. Clone or Download the Project
 Place all files in a single folder, e.g.:
 ```
-CMSC191_Salcedo_Final Project_cells.py
+face-analyzer.py
 emotions_model.hdf5
 shape_predictor_68_face_landmarks.dat
 requirements.txt
@@ -52,7 +52,7 @@ $env:PATH = "C:\Users\User\Desktop\CMSC 191_Salcedo_Final Project\tfenv\Scripts;
 ## Running the Application
 With the virtual environment activated and the clean PATH set, run:
 ```powershell
-python "CMSC191_Salcedo_Final Project_cells.py"
+python "face-analyzer.py"
 ```
 
 ## Usage
@@ -62,7 +62,7 @@ python "CMSC191_Salcedo_Final Project_cells.py"
 - Click "Exit" to close the app.
 
 ## Files
-- `CMSC191_Salcedo_Final Project_cells.py` — Main application code
+- `face-analyzer.py` — Main application code
 - `emotions_model.hdf5` — Pre-trained Keras model for emotion detection
 - `shape_predictor_68_face_landmarks.dat` — dlib facial landmark model
 - `requirements.txt` — Python dependencies
@@ -104,8 +104,8 @@ All PowerShell commands in this README can be run in Command Prompt (CMD) with t
     set PATH=C:\Users\User\Desktop\CMSC 191_Salcedo_Final Project\tfenv\Scripts;C:\Users\User\Desktop\CMSC 191_Salcedo_Final Project\tfenv;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;
     ```
 - **Run the application:**
-  - PowerShell: `python "CMSC191_Salcedo_Final Project_cells.py"`
-  - CMD: `python "CMSC191_Salcedo_Final Project_cells.py"`
+  - PowerShell: `python "face-analyzer.py"`
+  - CMD: `python "face-analyzer.py"`
 
 You can use either shell for all steps. If you encounter issues with one, try the other.
 
