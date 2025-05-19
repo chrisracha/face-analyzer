@@ -60,16 +60,19 @@ def analyze_face_shape(landmarks):
     jaw_to_height = jaw_width / face_height
     cheek_to_height = cheekbone_width / face_height
     forehead_to_height = forehead_width / face_height
-    # heuristic rules for face shape
-    if abs(jaw_to_height - cheek_to_height) < 0.05 and abs(cheek_to_height - forehead_to_height) < 0.05:
+    # calculate all differences
+    diffs = [abs(jaw_to_height - cheek_to_height), abs(cheek_to_height - forehead_to_height), abs(jaw_to_height - forehead_to_height)]
+    max_diff = max(diffs)
+    if max_diff < 0.04:
         return "Square"
-    elif cheek_to_height > jaw_to_height and cheek_to_height > forehead_to_height:
+    # require diamond to be clearly dominant
+    elif cheek_to_height > jaw_to_height + 0.03 and cheek_to_height > forehead_to_height + 0.03:
         return "Diamond"
-    elif jaw_to_height > cheek_to_height and jaw_to_height > forehead_to_height:
+    elif jaw_to_height > cheek_to_height + 0.03 and jaw_to_height > forehead_to_height + 0.03:
         return "Triangle"
-    elif forehead_to_height > cheek_to_height and forehead_to_height > jaw_to_height:
+    elif forehead_to_height > cheek_to_height + 0.03 and forehead_to_height > jaw_to_height + 0.03:
         return "Heart"
-    elif face_height / cheekbone_width > 1.5:
+    elif face_height / cheekbone_width > 1.6:
         return "Oval"
     else:
         return "Round"
