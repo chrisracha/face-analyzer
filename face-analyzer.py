@@ -65,91 +65,67 @@ def shape_to_np(shape, dtype="int"):
 # returns a string label for face shape
 
 def analyze_face_shape(landmarks):
-    # Based on Xie & Lam (2015) and Sforza et al. (2010)
-    # Calculate key facial measurements
-    # Jaw width (points 4 to 12)
+    # based on xie & lam (2015), sforza et al. (2010)
+    # jaw width: points 4-12
     jaw_width = np.linalg.norm(landmarks[4] - landmarks[12])
-    # Cheekbone width (points 1 to 15)
+    # cheekbone width: points 1-15
     cheekbone_width = np.linalg.norm(landmarks[1] - landmarks[15])
-    # Forehead width (points 17 to 26)
+    # forehead width: points 17-26
     forehead_width = np.linalg.norm(landmarks[17] - landmarks[26])
-    # Face height (chin to midpoint between eyebrows)
+    # face height: chin to brow midpoint
     chin = landmarks[8]
     brow_mid = ((landmarks[21] + landmarks[22]) // 2)
     face_height = np.linalg.norm(chin - brow_mid)
-    
-    # Calculate ratios based on anthropometric studies
+    # ratios
     jaw_to_height = jaw_width / face_height
     cheek_to_height = cheekbone_width / face_height
     forehead_to_height = forehead_width / face_height
-    
-    # Calculate facial thirds (based on Sforza et al., 2010)
-    upper_third = np.linalg.norm(landmarks[19] - landmarks[27])  # hairline to glabella
-    middle_third = np.linalg.norm(landmarks[27] - landmarks[33])  # glabella to subnasale
-    lower_third = np.linalg.norm(landmarks[33] - landmarks[8])   # subnasale to menton
-    
-    # Calculate facial width ratios (based on Xie & Lam, 2015)
+    # facial thirds
+    upper_third = np.linalg.norm(landmarks[19] - landmarks[27])
+    middle_third = np.linalg.norm(landmarks[27] - landmarks[33])
+    lower_third = np.linalg.norm(landmarks[33] - landmarks[8])
+    # width ratios
     bizygomatic_to_height = cheekbone_width / face_height
     bigonial_to_height = jaw_width / face_height
-    
-    # Initialize scores dictionary
     scores = {}
-    
-    # Square face shape criteria (Xie & Lam, 2015)
-    # Square faces have similar width measurements and strong jawline
+    # square: similar width, strong jaw
     square_score = 1.0 - abs(jaw_to_height - cheek_to_height) * 2.0
-    if abs(jaw_to_height - 0.85) < 0.1:  # Ideal jaw-to-height ratio
+    if abs(jaw_to_height - 0.85) < 0.1:
         square_score += 0.2
     scores['Square'] = square_score
-    
-    # Diamond face shape criteria (Sforza et al., 2010)
-    # Diamond faces have prominent cheekbones and narrower jaw/forehead
+    # diamond: prominent cheekbones
     diamond_score = (cheek_to_height - max(jaw_to_height, forehead_to_height)) * 2.0
-    if cheek_to_height > 0.9:  # Prominent cheekbones
+    if cheek_to_height > 0.9:
         diamond_score += 0.15
     scores['Diamond'] = diamond_score
-    
-    # Triangle face shape criteria
-    # Triangle faces have wider jaw and narrower forehead
+    # triangle: wide jaw, narrow forehead
     triangle_score = (jaw_to_height - forehead_to_height) * 2.0
-    if jaw_to_height > 0.9:  # Strong jawline
+    if jaw_to_height > 0.9:
         triangle_score += 0.15
     scores['Triangle'] = triangle_score
-    
-    # Heart face shape criteria (Sforza et al., 2010)
-    # Heart faces have wider forehead and narrower jaw
+    # heart: wide forehead, narrow jaw
     heart_score = (forehead_to_height - jaw_to_height) * 2.0
-    if forehead_to_height > 0.9:  # Wide forehead
+    if forehead_to_height > 0.9:
         heart_score += 0.15
     scores['Heart'] = heart_score
-    
-    # Oval face shape criteria (Xie & Lam, 2015)
-    # Oval faces have balanced proportions and slightly longer than wide
+    # oval: balanced, slightly longer
     oval_ratio = face_height / cheekbone_width
-    oval_score = 0.9 - abs(oval_ratio - 1.5) * 2.0  # Ideal ratio around 1.5
-    if 1.4 <= oval_ratio <= 1.6:  # Ideal range
+    oval_score = 0.9 - abs(oval_ratio - 1.5) * 2.0
+    if 1.4 <= oval_ratio <= 1.6:
         oval_score += 0.2
     scores['Oval'] = oval_score
-    
-    # Round face shape criteria (Sforza et al., 2010)
-    # Round faces have similar width and height measurements
+    # round: width ~ height
     round_ratio = face_height / cheekbone_width
-    if 0.9 <= round_ratio <= 1.1:  # Nearly equal width and height
+    if 0.9 <= round_ratio <= 1.1:
         round_score = 0.8 - abs(round_ratio - 1.0) * 4.0
     else:
         round_score = -abs(round_ratio - 1.0) * 4.0
     scores['Round'] = round_score
-    
-    # Find the best matching shape
     best_shape = max(scores, key=scores.get)
     best_score = scores[best_shape]
-    
-    # Check for borderline cases
     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     if len(sorted_scores) > 1 and abs(sorted_scores[0][1] - sorted_scores[1][1]) < 0.1:
         return f"{best_shape} (borderline with {sorted_scores[1][0]})"
-    
-    # Calculate confidence percentage
     confidence = min(max((best_score + 1) / 2, 0), 1) * 100
     return f"{best_shape} ({confidence:.0f}%)"
 
@@ -157,59 +133,44 @@ def analyze_face_shape(landmarks):
 # returns a string label for lip shape
 
 def analyze_lip_shape(landmarks):
-    # Based on Ferrario et al. (1997) - Three-dimensional analysis of lip form
+    # based on ferrario et al. (1997)
     lips = landmarks[48:68]
-    
-    # Calculate key measurements
-    width = np.linalg.norm(lips[0] - lips[6])  # Total lip width
-    upper_height = np.linalg.norm(lips[3] - lips[13])  # Upper lip height
-    lower_height = np.linalg.norm(lips[9] - lips[19])  # Lower lip height
-    cupid_width = np.linalg.norm(lips[2] - lips[4])  # Cupid's bow width
-    
-    # Calculate ratios
+    # key measurements
+    width = np.linalg.norm(lips[0] - lips[6])
+    upper_height = np.linalg.norm(lips[3] - lips[13])
+    lower_height = np.linalg.norm(lips[9] - lips[19])
+    cupid_width = np.linalg.norm(lips[2] - lips[4])
+    # ratios
     avg_height = (upper_height + lower_height) * 0.5
     width_to_height = width / avg_height if avg_height > 0 else 0
     cupid_ratio = cupid_width / width if width > 0 else 0
-    
-    # Initialize scores
     scores = {}
-    
-    # Wide lips criteria (adjusted)
-    if width_to_height > 3.0:  # Increased threshold
-        scores['Wide'] = 0.7  # Reduced base score
+    # wide: large width/height
+    if width_to_height > 3.0:
+        scores['Wide'] = 0.7
     else:
-        scores['Wide'] = (width_to_height - 2.5) * 0.8  # Reduced scaling
-    
-    # Full lips criteria (adjusted)
+        scores['Wide'] = (width_to_height - 2.5) * 0.8
+    # full: large height/width, prominent cupid's bow
     height_to_width = avg_height / width if width > 0 else 0
-    scores['Full'] = height_to_width * 3.0  # Increased weight
+    scores['Full'] = height_to_width * 3.0
     if cupid_ratio > 0.4:
         scores['Full'] += 0.3
-    
-    # Medium lips criteria (adjusted)
-    if 1.8 <= width_to_height <= 2.8:  # Widened range
+    # medium: balanced
+    if 1.8 <= width_to_height <= 2.8:
         scores['Medium'] = 0.8 - abs(width_to_height - 2.3) * 1.0
         if 0.3 <= cupid_ratio <= 0.5:
             scores['Medium'] += 0.2
     else:
         scores['Medium'] = -abs(width_to_height - 2.3) * 0.8
-    
-    # Normalize scores
     max_score = max(scores.values())
     if max_score > 0:
         for key in scores:
             scores[key] = scores[key] / max_score
-    
-    # Find best shape
     best_shape = max(scores, key=scores.get)
     best_score = scores[best_shape]
-    
-    # Check for borderline cases
     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     if len(sorted_scores) > 1 and abs(sorted_scores[0][1] - sorted_scores[1][1]) < 0.15:
         return f"{best_shape} (borderline with {sorted_scores[1][0]})"
-    
-    # Calculate confidence
     confidence = min(max(best_score * 100, 0), 100)
     return f"{best_shape} ({confidence:.0f}%)"
 
@@ -217,71 +178,46 @@ def analyze_lip_shape(landmarks):
 # returns a string label for nose shape
 
 def analyze_nose_shape(landmarks):
-    # Based on Borman & Campbell (2010) - Anthropometric analysis of the human nose
+    # based on borman & campbell (2010)
     nose = landmarks[27:36]
-    
-    # Calculate key measurements
-    # Nasal width (distance between alae)
+    # key measurements
     width = np.linalg.norm(nose[0] - nose[4])
-    
-    # Nasal height (from nasion to subnasale)
     height = np.linalg.norm(nose[0] - nose[6])
-    
-    # Nostril flare (distance between alar bases)
     nostril_flare = np.linalg.norm(landmarks[31] - landmarks[35])
-    
-    # Nasal bridge length (from nasion to rhinion)
     bridge_length = np.linalg.norm(nose[0] - nose[3])
-    
-    # Calculate ratios and proportions
+    # ratios
     width_to_height = width / height if height != 0 else 0
     flare_ratio = nostril_flare / width
     bridge_ratio = bridge_length / height
-    
-    # Initialize scores dictionary
     scores = {}
-    
-    # Flared nose criteria (Borman & Campbell, 2010)
-    # Flared noses have wider nostril flare relative to nasal width
+    # flared: wide nostril flare
     flared_score = (flare_ratio - 0.55) * 3.0
-    if flare_ratio > 0.6:  # Significant flare
+    if flare_ratio > 0.6:
         flared_score += 0.2
     scores['Flared'] = flared_score
-    
-    # Wide nose criteria
-    # Wide noses have larger width-to-height ratio
+    # wide: large width/height
     wide_score = (width_to_height - 0.85) * 2.0
-    if width_to_height > 0.9:  # Significantly wide
+    if width_to_height > 0.9:
         wide_score += 0.15
     scores['Wide'] = wide_score
-    
-    # Narrow nose criteria
-    # Narrow noses have smaller width-to-height ratio
+    # narrow: small width/height
     narrow_score = (0.65 - width_to_height) * 2.0
-    if width_to_height < 0.7:  # Significantly narrow
+    if width_to_height < 0.7:
         narrow_score += 0.15
     scores['Narrow'] = narrow_score
-    
-    # Medium nose criteria
-    # Medium noses have balanced proportions
+    # medium: balanced
     if 0.75 <= width_to_height <= 0.85:
         medium_score = 0.8 - abs(width_to_height - 0.8) * 4.0
-        if 0.4 <= bridge_ratio <= 0.6:  # Moderate bridge length
+        if 0.4 <= bridge_ratio <= 0.6:
             medium_score += 0.15
     else:
         medium_score = -abs(width_to_height - 0.8) * 3.0
     scores['Medium'] = medium_score
-    
-    # Find the best matching shape
     best_shape = max(scores, key=scores.get)
     best_score = scores[best_shape]
-    
-    # Check for borderline cases
     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     if len(sorted_scores) > 1 and abs(sorted_scores[0][1] - sorted_scores[1][1]) < 0.1:
         return f"{best_shape} (borderline with {sorted_scores[1][0]})"
-    
-    # Calculate confidence percentage
     confidence = min(max((best_score + 1) / 2, 0), 1) * 100
     return f"{best_shape} ({confidence:.0f}%)"
 
@@ -289,94 +225,63 @@ def analyze_nose_shape(landmarks):
 # returns a string label for eye shape
 
 def analyze_eye_shape(landmarks):
-    # Based on Ercan et al. (2008) and Xie & Lam (2015)
+    # based on ercan et al. (2008), xie & lam (2015)
     left_eye = landmarks[36:42]
     right_eye = landmarks[42:48]
-    
     def eye_features(eye):
-        # Calculate key measurements for a single eye
-        # Eye width (horizontal distance)
+        # key measurements
         width = np.linalg.norm(eye[0] - eye[3])
-        
-        # Eye height (average of upper and lower lid distances)
         upper_height = np.linalg.norm(eye[1] - eye[5])
         lower_height = np.linalg.norm(eye[2] - eye[4])
         height = (upper_height + lower_height) / 2
-        
-        # Eye area (using shoelace formula)
         area = 0.5 * abs(
             sum(eye[i][0]*eye[(i+1)%6][1] - eye[(i+1)%6][0]*eye[i][1] for i in range(6))
         )
-        
-        # Eye opening ratio (height/width)
         ratio = width / height if height != 0 else 0
-        
-        # Eye corner angles
         inner_angle = np.arctan2(eye[1][1] - eye[0][1], eye[1][0] - eye[0][0])
         outer_angle = np.arctan2(eye[2][1] - eye[3][1], eye[2][0] - eye[3][0])
         angle_diff = abs(inner_angle - outer_angle)
-        
         return ratio, area, angle_diff
-    
-    # Calculate features for both eyes
     left_ratio, left_area, left_angle = eye_features(left_eye)
     right_ratio, right_area, right_angle = eye_features(right_eye)
-    
-    # Average measurements
     avg_ratio = (left_ratio + right_ratio) / 2
     avg_area = (left_area + right_area) / 2
     avg_angle = (left_angle + right_angle) / 2
-    
-    # Initialize scores dictionary
     scores = {}
-    
-    # Almond eyes criteria (Xie & Lam, 2015)
-    # Almond eyes have specific ratio and angle characteristics
+    # almond: ideal ratio, upturned corners
     almond_score = 0.85 - abs(avg_ratio - 2.4) * 1.2
-    if 2.1 <= avg_ratio <= 2.7:  # Ideal ratio range
+    if 2.1 <= avg_ratio <= 2.7:
         almond_score += 0.15
-    if avg_angle > 0.3:  # Upturned outer corners
+    if avg_angle > 0.3:
         almond_score += 0.1
     scores['Almond'] = almond_score
-    
-    # Large eyes criteria (Ercan et al., 2008)
-    # Large eyes have greater area and moderate ratio
+    # large: greater area, moderate ratio
     large_score = ((avg_area - 350) / 750) - 0.25
-    if avg_area > 400:  # Significantly large area
+    if avg_area > 400:
         large_score += 0.2
-    if 1.8 <= avg_ratio <= 2.2:  # Moderate ratio
+    if 1.8 <= avg_ratio <= 2.2:
         large_score += 0.1
     scores['Large'] = large_score
-    
-    # Small eyes criteria (Ercan et al., 2008)
-    # Small eyes have smaller area and often rounder shape
+    # small: smaller area, rounder
     small_score = ((150 - avg_area) / 200) - 0.2
-    if avg_area < 140:  # Significantly small area
+    if avg_area < 140:
         small_score += 0.2
-    if avg_ratio < 1.8:  # Rounder shape
+    if avg_ratio < 1.8:
         small_score += 0.1
     scores['Small'] = small_score
-    
-    # Round eyes criteria (Xie & Lam, 2015)
-    # Round eyes have more equal width and height
+    # round: width ~ height
     if 1.7 <= avg_ratio <= 1.9:
         round_score = 0.8 - abs(avg_ratio - 1.8) * 2.5
-        if avg_angle < 0.2:  # Less upturned corners
+        if avg_angle < 0.2:
             round_score += 0.15
     else:
         round_score = -abs(avg_ratio - 1.8) * 2.5
     scores['Round'] = round_score
-    
-    # Find the best matching shape
     best_shape = max(scores, key=scores.get)
     best_score = scores[best_shape]
-    
-    # Check for borderline cases
     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     if len(sorted_scores) > 1 and abs(sorted_scores[0][1] - sorted_scores[1][1]) < 0.1:
         return f"{best_shape} (borderline with {sorted_scores[1][0]})"
-    
-    # Calculate confidence percentage
     confidence = min(max((best_score + 1) / 2, 0), 1) * 100
     return f"{best_shape} ({confidence:.0f}%)"
 
