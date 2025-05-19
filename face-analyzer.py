@@ -1,3 +1,5 @@
+# chris samuel salcedo
+# 2022-05055
 # cmsc191 final project: face, feature shape analyzer
 #
 # dependencies:
@@ -17,7 +19,7 @@ from tensorflow.keras.preprocessing.image import img_to_array
 import cv2
 import numpy as np
 from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout, QPushButton, QCheckBox, QHBoxLayout
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtGui import QImage, QPixmap, QPainter
 from PyQt5.QtCore import QTimer, Qt
 import dlib
 
@@ -30,8 +32,25 @@ landmark_predictor = dlib.shape_predictor(model_path)
 # load emotion detection model
 emotion_model_path = os.path.join(script_dir, 'emotions_model.hdf5')
 emotion_classifier = load_model(emotion_model_path, compile=False)
-print("emotion model input shape:", emotion_classifier.input_shape)
 emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+
+# load emoji pngs for AR overlay (one per emotion)
+emoji_files = {
+    'Angry': 'emoji_angry.png',
+    'Disgust': 'emoji_disgust.png',
+    'Fear': 'emoji_fear.png',
+    'Happy': 'emoji_happy.png',
+    'Sad': 'emoji_sad.png',
+    'Surprise': 'emoji_surprise.png',
+    'Neutral': 'emoji_neutral.png',
+}
+emoji_imgs = {}
+for label, fname in emoji_files.items():
+    path = os.path.join(script_dir, fname)
+    if os.path.exists(path):
+        emoji_imgs[label] = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    else:
+        emoji_imgs[label] = None
 
 # helper function to convert dlib shape to numpy array
 # returns 68x2 array of landmark coordinates
@@ -63,19 +82,30 @@ def analyze_face_shape(landmarks):
     # calculate all differences
     diffs = [abs(jaw_to_height - cheek_to_height), abs(cheek_to_height - forehead_to_height), abs(jaw_to_height - forehead_to_height)]
     max_diff = max(diffs)
-    if max_diff < 0.04:
-        return "Square"
-    # require diamond to be clearly dominant
-    elif cheek_to_height > jaw_to_height + 0.03 and cheek_to_height > forehead_to_height + 0.03:
-        return "Diamond"
-    elif jaw_to_height > cheek_to_height + 0.03 and jaw_to_height > forehead_to_height + 0.03:
-        return "Triangle"
-    elif forehead_to_height > cheek_to_height + 0.03 and forehead_to_height > jaw_to_height + 0.03:
-        return "Heart"
-    elif face_height / cheekbone_width > 1.6:
-        return "Oval"
+    min_diff = min(diffs)
+    oval_ratio = face_height / cheekbone_width if cheekbone_width != 0 else 0
+    # assign scores for each shape
+    scores = {}
+    scores['Square'] = 1.0 - max_diff * 25  # more sensitive to differences
+    scores['Diamond'] = cheek_to_height - max(jaw_to_height, forehead_to_height) + 0.05  # small boost
+    scores['Triangle'] = jaw_to_height - max(cheek_to_height, forehead_to_height) + 0.05  # small boost
+    scores['Heart'] = forehead_to_height - max(cheek_to_height, jaw_to_height) + 0.05  # small boost
+    scores['Oval'] = 0.9 - abs(oval_ratio - 1.4) * 4.5  # slightly harder to get
+    # round: stricter, only for ratio very close to 1.0
+    if 0.95 <= oval_ratio <= 1.08:
+        round_score = 0.4 - abs(oval_ratio - 1.0) * 10  # stricter round detection
     else:
-        return "Round"
+        round_score = -abs(oval_ratio - 1.0) * 10
+    scores['Round'] = round_score
+    # pick the best score
+    best_shape = max(scores, key=scores.get)
+    best_score = scores[best_shape]
+    # borderline warning if two shapes are close
+    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    if len(sorted_scores) > 1 and abs(sorted_scores[0][1] - sorted_scores[1][1]) < 0.08:
+        return f"{best_shape} (borderline with {sorted_scores[1][0]})"
+    confidence = min(max((best_score + 1) / 2, 0), 1) * 100
+    return f"{best_shape} ({confidence:.0f}%)"
 
 # analyze lip shape using landmarks
 # returns a string label for lip shape
@@ -87,12 +117,30 @@ def analyze_lip_shape(landmarks):
     lower_height = np.linalg.norm(lips[9] - lips[19])
     avg_height = (upper_height + lower_height) / 2
     ratio = width / avg_height if avg_height != 0 else 0
-    if ratio > 2.2:
-        return "Wide"
-    elif ratio < 1.4:
-        return "Full"
+    scores = {}
+    if ratio > 2.6:
+        scores['Wide'] = 0.85 
     else:
-        return "Medium"
+        scores['Wide'] = ratio - 2.7 
+        
+    if ratio < 1.4:
+        scores['Full'] = 0.85 
+    else:
+        scores['Full'] = 1.6 - ratio
+        
+    if 1.7 <= ratio <= 2.3:
+        scores['Medium'] = 0.7 - abs(ratio - 2.0) * 1.8  # peak at ratio=2.0
+    else:
+        scores['Medium'] = -abs(ratio - 2.0) * 1.5  # steep drop-off
+        
+    best_shape = max(scores, key=scores.get)
+    best_score = scores[best_shape]
+    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    # reduced sensitivity for borderline detection (from 0.08 to 0.05)
+    if len(sorted_scores) > 1 and abs(sorted_scores[0][1] - sorted_scores[1][1]) < 0.05:
+        return f"{best_shape} (borderline with {sorted_scores[1][0]})"
+    confidence = min(max((best_score + 1) / 2, 0), 1) * 100
+    return f"{best_shape} ({confidence:.0f}%)"
 
 # analyze nose shape using landmarks
 # returns a string label for nose shape
@@ -103,14 +151,18 @@ def analyze_nose_shape(landmarks):
     height = np.linalg.norm(nose[0] - nose[6])
     nostril_flare = np.linalg.norm(landmarks[31] - landmarks[35])
     ratio = width / height if height != 0 else 0
-    if nostril_flare / width > 0.5:
-        return "Flared"
-    elif ratio > 0.9:
-        return "Wide"
-    elif ratio < 0.6:
-        return "Narrow"
-    else:
-        return "Medium"
+    scores = {}
+    scores['Flared'] = (nostril_flare / width) - 0.55  # slightly harder threshold
+    scores['Wide'] = ratio - 0.95  # adjusted threshold
+    scores['Narrow'] = 0.65 - ratio  # adjusted threshold
+    scores['Medium'] = -abs(ratio - 0.8) * 1.2  # adjusted ideal ratio and sensitivity
+    best_shape = max(scores, key=scores.get)
+    best_score = scores[best_shape]
+    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    if len(sorted_scores) > 1 and abs(sorted_scores[0][1] - sorted_scores[1][1]) < 0.08:
+        return f"{best_shape} (borderline with {sorted_scores[1][0]})"
+    confidence = min(max((best_score + 1) / 2, 0), 1) * 100
+    return f"{best_shape} ({confidence:.0f}%)"
 
 # analyze eye shape using landmarks
 # returns a string label for eye shape
@@ -121,7 +173,6 @@ def analyze_eye_shape(landmarks):
     def eye_features(eye):
         width = np.linalg.norm(eye[0] - eye[3])
         height = (np.linalg.norm(eye[1] - eye[5]) + np.linalg.norm(eye[2] - eye[4])) / 2
-        # area using shoelace formula
         area = 0.5 * abs(
             sum(eye[i][0]*eye[(i+1)%6][1] - eye[(i+1)%6][0]*eye[i][1] for i in range(6))
         )
@@ -131,14 +182,38 @@ def analyze_eye_shape(landmarks):
     right_ratio, right_area = eye_features(right_eye)
     avg_ratio = (left_ratio + right_ratio) / 2
     avg_area = (left_area + right_area) / 2
-    if avg_ratio > 2.5:
-        return "Almond"
-    elif avg_area > 400:
-        return "Large"
-    elif avg_area < 200:
-        return "Small"
+    scores = {}
+    # almond: focused on ratio with moderate area influence
+    almond_score = 0.85 - abs(avg_ratio - 2.4) * 1.2 - abs(avg_area - 250) / 250
+    if 2.1 <= avg_ratio <= 2.7:  # small ratio boost if in range
+        almond_score += 0.1
+    scores['Almond'] = almond_score
+    
+    # large: depends more on area, less on ratio
+    large_score = ((avg_area - 350) / 750) - 0.25
+    if avg_area > 400:  # area boost if significantly large
+        large_score += 0.1
+    scores['Large'] = large_score
+    
+    # small: depends more on area, less on ratio
+    small_score = ((150 - avg_area) / 200) - 0.2
+    if avg_area < 140:  # area boost if significantly small
+        small_score += 0.1
+    scores['Small'] = small_score
+    
+    # round: depends on specific ratio range and moderate area
+    if 1.7 <= avg_ratio <= 1.9:
+        round_score = 0.4 - abs(avg_ratio - 1.8) * 2.5 - abs(avg_area - 220) / 350
     else:
-        return "Round"
+        round_score = -abs(avg_ratio - 1.8) * 2.5 - abs(avg_area - 220) / 250
+    scores['Round'] = round_score
+    best_shape = max(scores, key=scores.get)
+    best_score = scores[best_shape]
+    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    if len(sorted_scores) > 1 and abs(sorted_scores[0][1] - sorted_scores[1][1]) < 0.08:
+        return f"{best_shape} (borderline with {sorted_scores[1][0]})"
+    confidence = min(max((best_score + 1) / 2, 0), 1) * 100
+    return f"{best_shape} ({confidence:.0f}%)"
 
 # main menu widget
 class MainMenu(QWidget):
@@ -154,7 +229,7 @@ class MainMenu(QWidget):
         layout.addWidget(title)
         # add a vertical spacer
         layout.addSpacing(30)
-        self.face_btn = QPushButton('Analyze Face Features')
+        self.face_btn = QPushButton('Analyze Facial Features')
         self.face_btn.setFixedSize(220, 50)
         self.face_btn.setStyleSheet('font-size: 16px;')
         self.exit_btn = QPushButton('Exit')
@@ -306,16 +381,29 @@ class FaceAnalyzerApp(QWidget):
                         label_pos = (x, max(y - 20, 20))
                         cv2.putText(frame, emotion_text, label_pos, cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,0,0), 4, cv2.LINE_AA)
                         cv2.putText(frame, emotion_text, label_pos, cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,255), 2, cv2.LINE_AA)
+                        # overlay emotion-specific emoji png beside label
+                        emoji_img = emoji_imgs.get(emotion_label)
+                        if emoji_img is not None:
+                            emoji_h = 48  # recommended: 44-56px for visibility
+                            emoji_w = int(emoji_img.shape[1] * (emoji_h / emoji_img.shape[0]))
+                            emoji_resized = cv2.resize(emoji_img, (emoji_w, emoji_h), interpolation=cv2.INTER_AREA)
+                            ex = label_pos[0] - emoji_w - 10  # left of label, with 10px gap
+                            ey = label_pos[1] - int(emoji_h/2)
+                            if ex >= 0 and ey+emoji_h < frame.shape[0] and ey >= 0:
+                                overlay = frame[ey:ey+emoji_h, ex:ex+emoji_w]
+                                alpha_emoji = emoji_resized[:,:,3] / 255.0
+                                alpha_bg = 1.0 - alpha_emoji
+                                for c in range(3):
+                                    overlay[:,:,c] = (alpha_emoji * emoji_resized[:,:,c] + alpha_bg * overlay[:,:,c])
+                                frame[ey:ey+emoji_h, ex:ex+emoji_w] = overlay
                     else:
                         emotion_text = "Emotion: (undetected)"
                 except Exception:
                     emotion_text = "Emotion: (undetected)"
             result_text = f"Face: {face_shape_label}\nLips: {analyze_lip_shape(landmarks)}\nNose: {analyze_nose_shape(landmarks)}\nEyes: {analyze_eye_shape(landmarks)}"
             break
-        # always show emotion in result label if enabled
         if self.cb_emotion.isChecked():
             result_text += f"\n{emotion_text if emotion_text else 'Emotion: (undetected)'}"
-        # update face shape title label above webcam
         self.face_shape_title.setText(f"Face Shape: {face_shape_label}")
         rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_image.shape

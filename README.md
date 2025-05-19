@@ -38,7 +38,7 @@ python -m venv tfenv
 pip install -r requirements.txt
 ```
 
-### 5. Install Microsoft Visual C++ Redistributable (x64)
+### 5. (Optional) Install Microsoft Visual C++ Redistributable (x64)
 Download and install from:
 https://aka.ms/vs/17/release/vc_redist.x64.exe
 Reboot after installation.
