@@ -1,17 +1,9 @@
+#%%
 # chris samuel salcedo
 # 2022-05055
 # cmsc191 final project: face, feature shape analyzer
-#
-# dependencies:
-# - opencv-python
-# - pyqt5
-# - numpy
-# - dlib (for facial landmark detection)
-# - tensorflow
-#
-# before running, install dependencies:
-# pip install opencv-python pyqt5 numpy dlib tensorflow
 
+#%%
 import os
 import sys
 from tensorflow.keras.models import load_model
@@ -52,6 +44,7 @@ for label, fname in emoji_files.items():
     else:
         emoji_imgs[label] = None
 
+#%%
 # helper function to convert dlib shape to numpy array
 # returns 68x2 array of landmark coordinates
 
@@ -285,6 +278,7 @@ def analyze_eye_shape(landmarks):
     confidence = min(max((best_score + 1) / 2, 0), 1) * 100
     return f"{best_shape} ({confidence:.0f}%)"
 
+#%%
 # main menu widget
 class MainMenu(QWidget):
     def __init__(self, face_callback):
@@ -322,6 +316,7 @@ class MainMenu(QWidget):
     def exit_all(self):
         QApplication.quit()
 
+#%%
 # main face analyzer widget
 class FaceAnalyzerApp(QWidget):
     def __init__(self, back_callback=None):
@@ -442,8 +437,8 @@ class FaceAnalyzerApp(QWidget):
                         face_roi = cv2.resize(face_roi, (64, 64))
                         face_roi = face_roi.astype("float32") / 255.0
                         if len(face_roi.shape) == 2:
-                            face_roi = np.expand_dims(face_roi, axis=-1)  # (64, 64, 1)
-                        face_roi = np.expand_dims(face_roi, axis=0)  # (1, 64, 64, 1)
+                            face_roi = np.expand_dims(face_roi, axis=-1)
+                        face_roi = np.expand_dims(face_roi, axis=0) 
                         preds = emotion_classifier.predict(face_roi, verbose=0)[0]
                         emotion_probability = np.max(preds)
                         emotion_label = emotion_labels[preds.argmax()]
@@ -454,7 +449,7 @@ class FaceAnalyzerApp(QWidget):
                         # overlay emotion-specific emoji png beside label
                         emoji_img = emoji_imgs.get(emotion_label)
                         if emoji_img is not None:
-                            emoji_h = 48  # recommended: 44-56px for visibility
+                            emoji_h = 48 
                             emoji_w = int(emoji_img.shape[1] * (emoji_h / emoji_img.shape[0]))
                             emoji_resized = cv2.resize(emoji_img, (emoji_w, emoji_h), interpolation=cv2.INTER_AREA)
                             ex = label_pos[0] - emoji_w - 10  # left of label, with 10px gap

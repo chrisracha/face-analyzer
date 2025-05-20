@@ -125,7 +125,7 @@ You can use either shell for all steps. If you encounter issues with one, try th
 - PyQt5: https://riverbankcomputing.com/software/pyqt/
 - TensorFlow/Keras: https://www.tensorflow.org/
 - `shape_predictor_68_face_landmarks.dat`: [dlib model by Davis E. King](http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2)
-- `emotions_model.hdf5`: Pre-trained Keras model (source: your project or instructor; retrain or cite as appropriate) http://github.com/oarriaga/face_classification/tree/master/trained_models/emotion_models
+- `emotions_model.hdf5`: Pre-trained Keras model http://github.com/oarriaga/face_classification/tree/master/trained_models/emotion_models
 
 ---
 For further help, please provide error messages and your environment details.
